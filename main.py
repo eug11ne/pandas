@@ -1,6 +1,12 @@
 import pandas as pd
-from tick import Tick
-from tick import corr_vectors, plot_nvector_any, load_vectors
+
+from tick import Tick, load_vectors
+from vectors import Vectors
+from tick_vectors import Tick_vectors, plot_nvector_any
+from tick_model import Tick_model
+from training_set import Tick_training_set
+from tick_correlation import Tick_lags
+
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import rrule, MONTHLY, DAILY, WEEKLY
 import numpy as np
@@ -9,14 +15,118 @@ from datetime import datetime
 from datetime import date
 import matplotlib.pyplot as plt
 
+#abc = Vectors.from_file('SBER_220101_221231.csv', 2, 2)
+#print(abc.vectors)
+
+
+''' clf = LogisticRegression(max_iter=1000)
+clf.fit(df_train,df_train_target)
+joblib.dump(clf, "model.pkl")
+
+во втором:
+
+clf2 = joblib.load("model.pkl")
+y_pred = clf2.predict(df_val) '''
+
+gaz = Tick('SBER_190101_191230.csv')
+v_width=3
+sber = Tick_vectors.from_file('SBER_190101_191230.csv', v_width=0.5, v_prominence=1)
+#plt.plot(sber.ema(5*1000))
+#plt.plot(sber.ema(1000))
+plt.plot(sber.ema(int(sber.size/90)))
+plt.plot(sber.ema(int(sber.size/40)))
+plt.plot(sber.price)
+sber.plot()
+plt.show()
+print(int(sber.size/90))
+print(int(sber.size/40))
+
+#gaz.ema(1000)
+#gaz.ema(1000)
+exit()
 
 
 vector_correlation = 0.45
 
-v_width = 200
-sber = Tick('SBER_220701_220921.csv', v_width=v_width)
+v_width = 0.1
+v_prominence = v_width*2
+trset = Tick_training_set('comb-vectors-20k.csv', 50, 'std', features=5)
+#trset = Tick_training_set('comb-vectors-10k.csv', 20, 'sum2v', features=7)
+# trset = Tick_training_set('all-vectors-10k.csv', 50, 'sum', features=3)
+trset.create_model()
+#sber = Tick_vectors.from_file('SBER_170101_171230.csv', v_width=v_width, v_prominence=v_prominence)
+#abc = Vectors.from_file('SBER_180101_181231.csv', 0.5, 1)
+#bcd = Vectors.from_df(sber.data, 1, 1)
+
+#print(abc.vectors)
+exit()
+#sber = Tick_vectors.from_file('SBER_170101_171230.csv', v_width=v_width, v_prominence=v_prominence)
+#rv = Vectors(sber.vectors, sber.price[0])
+#a = rv.vector_to_predict_sum(10)
+#print(a)
+#exit()
+
+#gaz = Tick('SBER_220701_220921.csv')
 
 
+
+#trset.find_best_model()
+exit()
+
+sber = Tick_model('1min.txt', v_width=v_width, v_prominence=v_prominence)
+sber.vector_to_predict(10)
+sber.create_training_set(10)
+lag_width = 10
+rv = Vectors(sber.vectors, sber.price[0])
+#pred = rv.fast_predict("trs_model-1step_13.pkl", 10))
+#exit()
+#rv.create_training_set(10)
+#rv.vector_to_predict(10)
+#rv.vector_to_predict_cos(10)
+#exit()
+#rv.fast_predict()
+
+rvv = rv.slice(100, 20)
+#exit()
+pred = rvv.fast_predict('trs_model-1step_13.pkl', 10)
+pred2 = rvv.fast_predict('trs_model-2step_13.pkl', 10)
+pred3 = rvv.fast_predict('trs_model-3step_13.pkl', 10)
+print("pred", pred)
+rvv.plot()
+rvv.add(pred, 200, 2)
+rvv.add(pred2, 200, 2)
+rvv.add(pred3, 200, 2)
+rvv.plot(divider=rvv.vectors.shape[0]-3)
+plt.show()
+
+#sber.create_model_for_vectors(10)
+exit()
+
+#sber_c = Tick_lags('SBER_210101_211231.csv')
+exit()
+#nums = [0.5]#, 1, 2, 3]
+
+#for num in nums:
+#    current_tick = Tick_model('1.txt', v_width=num, v_prominence=num*1)
+#    current_tick.rich_vectors.slice(current_tick.vectors.shape[0]-10, 10).plot()
+
+#current_tick = Tick_model('1.txt', v_width=3, v_prominence=7)
+#print("Pred ", current_tick.fast_predict('model-1step.pkl', 10))
+#current_tick.plot()
+
+#current_tick.rich_vectors.slice(5, 10).plot()
+#current_tick.rich_vectors.plot()
+#plt.show()
+#exit()
+#sber_c.corr()
+#len = 15
+
+#for b in np.arange(0.09, 1, 0.1):
+#    results = sber_c.is_one_level(b, len)
+#    for r in results:
+#        sber_c.plot_lag(r, len*10, title=str(b))
+#    plt.show()
+#exit()
 #gaz = Tick('GAZP_210101_220829.csv')
 #luk = Tick('SNGS_210101_220829.csv')
 #vtb = Tick('VTBR_210101_220829.csv')
@@ -27,14 +137,10 @@ print('sberend', sber.end)
 
 #print("autocor {}".format(sber.data['CLOSE'].pct_change().autocorr()))
 
-#sber.modelling(150)
 #sber.enrich(alum, 'AL')
 #sber.enrich(usd, 'USD')
 #print(sber.data['VAR'])
 
-#sber.promodelling()
-#sber.modelling()
-#alum.modelling()
 print(sber.vol)
 print(sber.price)
 
@@ -60,8 +166,16 @@ print("sber.vector", sber.vector(last_lag, lag_width))
 print('vector-10', sber.vector(last_lag,10))
 
 lag_width = 10
+sber.create_model_for_vectors(10)
+exit()
 
-current_tick = Tick('SBER_220701_220921.csv', v_width=100)
+current_tick = Tick('1min_10052022_18102022.txt', v_width=200)
+print('PREDICTING...')
+print("PREDICTION 1", current_tick.fast_predict('model-1step.pkl', 10))
+print("PREDICTION 2", current_tick.fast_predict('model-2step.pkl', 10))
+print("PREDICTION 3", current_tick.fast_predict('model-3step.pkl', 10))
+
+exit()
 #50 is about 1 day for a lag of 20
 #400 is about 1 month for a lag of 10
 last_lag = current_tick.vectors.shape[0] - 10
@@ -79,7 +193,7 @@ last_vectors = np.zeros((0,lag_width,3))
 
 pl_n=1
 for j in range(50, 100, 50):
-    current_tick = Tick('SBER_220701_220921.csv', v_width=j)
+    current_tick = Tick('Сбербанк_1min_10052022_06102022.txt', v_width=j)
     last_lag = current_tick.vectors.shape[0] - lag_width
     last_vector = current_tick.vector(last_lag, lag_width)
     last_vectors = np.concatenate((last_vectors, last_vector[np.newaxis,:,:]))
