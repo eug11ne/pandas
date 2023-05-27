@@ -21,6 +21,6 @@ for file in p_test.glob('*.csv'):
 
 
 print(all_test)
-all_train.to_csv('big_training_set.csv', header=False, index=False, sep=',')
-all_test.to_csv('big_test_set.csv', header=False, index=False, sep=',')
+all_train.to_csv('ARLS_big_training_set.csv', header=False, index=False, sep=',')
+all_test.to_csv('ALRS_big_test_set.csv', header=False, index=False, sep=',')
 

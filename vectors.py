@@ -23,8 +23,9 @@ class Vectors():
         print("Initial price: ", init_price)
 
     @classmethod
-    def from_file(cls, file, v_width, v_prominence):
-        tvectors = Tick_vectors.from_file(file, v_width, v_prominence)
+    def from_file(cls, file, v_width, v_prominence, add_mean=60, comb_ratio=None):
+        tvectors = Tick_vectors.from_file(file, v_width, v_prominence, add_mean, comb_ratio)
+        print("from V:", add_mean)
         first_price = tvectors.price[int(tvectors.peaks[0])]
         #cls.last_price = tvectors.price[int(tvectors.peaks[-1])]
         peaks = tvectors.peaks
@@ -32,17 +33,18 @@ class Vectors():
         return cls(tvectors.vectors, first_price, peaks)
 
     @classmethod
-    def from_df(cls, data, v_width, v_prominence):
-        tvectors = Tick_vectors(data, v_width, v_prominence)
+    def from_df(cls, data, v_width, v_prominence, comb_ratio=None):
+        tvectors = Tick_vectors(data, v_width, v_prominence, comb_ratio)
         first_price = tvectors.price[int(tvectors.peaks[0])]
         #cls.last_price = tvectors.price[int(tvectors.peaks[-1])]
         peaks = tvectors.peaks
 
         return cls(tvectors.vectors, first_price, peaks)
 
-    def add(self, x, y, v):
-        self.vectors = np.concatenate([self.vectors, np.array([[float(x), float(y), float(v)]], dtype=object)])
+    def add(self, x, y, v, ema1, ema2):
+        self.vectors = np.concatenate([self.vectors, np.array([[float(x), float(y), float(v), ema1, ema2]], dtype=object)])
         self.normalized = self.normalize()
+        self.length+=1
         #self.vectors = np.concatenate([self.vectors, np.array([[float(x*self.x_max/10), float(y*self.y_max/10), float(v*self.v_max/10)]], dtype=object)])
 
 
@@ -74,11 +76,13 @@ class Vectors():
         norm_vector[:, 0], self.x_max = normalize_list(self.vectors[:, 0]) #x
         norm_vector[:, 1], self.y_max = normalize_list(self.vectors[:, 1]) #y
         norm_vector[:, 2], self.v_max = normalize_list(self.vectors[:, 2])#volume
+        norm_vector[:, 3], self.ema1_max = normalize_list(self.vectors[:, 3])# ema1
+        norm_vector[:, 4], self.ema2_max = normalize_list(self.vectors[:, 4])# ema2
 
         return norm_vector
 
     def comb(self, ratio=0.9):
-        neu = np.zeros((0,3))
+        neu = np.zeros((0,5))
         print(neu)
         n=True
         i=0
@@ -89,32 +93,36 @@ class Vectors():
                 combinedx = self.vectors[i, 0]
                 combinedy = self.vectors[i, 1]
                 combinedv = self.vectors[i, 2]
+                ema1 = self.vectors[i, 3]
+                ema2 = self.vectors[i, 4]
                 keep_running = True
                 while np.abs(self.vectors[i+j+1,0]) < np.abs(self.vectors[i+j+2,0])*ratio and keep_running:
                     combinedx+= (self.vectors[i+j+1,0]+self.vectors[i+j+2,0])
                     combinedy+=(self.vectors[i+j+1,1]+self.vectors[i+j+2,1])
                     combinedv+=(np.abs(self.vectors[i+1+j,2])+np.abs(self.vectors[i+2+j,2]))*np.sign(self.vectors[i, 2])
+                    ema1=self.vectors[i+j+2,3]
+                    ema2=self.vectors[i+j+2,4]
                     j += 2
                     if i+j>len(self.vectors)-5:
                         break
 
-                neu = np.concatenate((neu, np.array([[combinedx,combinedy,combinedv]])), axis=0)
+                neu = np.concatenate((neu, np.array([[combinedx,combinedy,combinedv, ema1, ema2]])), axis=0)
                 i+=3+j-2
             else:
-                neu = np.concatenate((neu, np.array([[self.vectors[i,0],self.vectors[i,1],self.vectors[i,2]]])), axis=0)
+                neu = np.concatenate((neu, np.array([[self.vectors[i,0],self.vectors[i,1],self.vectors[i,2],self.vectors[i,3],self.vectors[i,4]]])), axis=0)
                 i+=1
 
         last_piece = len(self.vectors) - i
-        print('Last piece', last_piece)
+        #print('Last piece', last_piece)
         for i in range(last_piece,0,-1):
-            neu = np.concatenate((neu, np.array([[self.vectors[-i, 0], self.vectors[-i, 1], self.vectors[-i, 2]]])), axis=0)
+            neu = np.concatenate((neu, np.array([[self.vectors[-i, 0], self.vectors[-i, 1], self.vectors[-i, 2], self.vectors[-i, 3], self.vectors[-i, 4]]])), axis=0)
         peaks = []
         sum=self.peaks[0]
         for peak in neu[:,1]:
             peaks.append(int(sum+peak))
             sum+=peak
-        print(self.peaks, len(self.peaks))
-        print(peaks,  len(peaks))
+        #print(self.peaks, len(self.peaks))
+        #print(peaks,  len(peaks))
 
 
         #self.plot()
@@ -239,32 +247,34 @@ class Vectors():
 
     def vector_to_predict_std(self, lag_length=10):
         #to_model = pd.DataFrame()
-        to_model = prep(['X', 'LEN', 'POWER', 'RATIO', 'Y'], lag_length)
+        to_model = prep(['X', 'LEN', 'EMA1', 'EMA2', 'EMADIFF', 'Y', 'VOL', 'RATIO'], lag_length)
         last_lag = self.vectors.shape[0] - lag_length
         #vector = self.vector(last_lag, lag_length)
-        r_vector = self.slice(last_lag-1, lag_length+1)
+        r_vector = self.slice(last_lag, lag_length)
         x_m = r_vector.x_max
         y_m = r_vector.y_max
         v_m = r_vector.v_max
         vector = r_vector.normalized
         #print("V to pred ", vector)
         temp = pd.DataFrame()
-
         li = np.zeros(0)
 
         for j in range(lag_length):
 
             x = vector[j, 0]
-            #x_prev = vector[j - 1, 0]
+            x_prev = vector[j - 1, 0] if j>0 else 1
 
             y = vector[j, 1]
-            power = vector[j, 2] / vector[j, 0]
-            ratio = x*abs(power) if vector[j, 2] > 7 else 0
+            vol = vector[j, 2]
+            ratio = x/abs(x_prev)
 
-            len = np.sqrt(x**2 + y**2)
+            length = np.sqrt(x**2 + y**2)
+            ema1 = vector[j, 3]
+            ema2 = vector[j, 4]
+            emadiff = ema1 - ema2
             #ratio = x/abs(x_prev)
 
-            li = np.append(li, [x, len, power, ratio, y])
+            li = np.append(li, [x, length, ema1, ema2, emadiff, y, vol, ratio])
 
         X_p = pd.DataFrame(li.reshape(1, -1), columns=to_model.columns)
            # to_model = pd.concat([to_model, temp], ignore_index=True)
@@ -423,6 +433,8 @@ def denormalize_vector(vector, x, y, v):
     denorm_vector[:, 0] = denormalize_list(vector[:, 0], x)  # x
     denorm_vector[:, 1] = denormalize_list(vector[:, 1], y)  # y
     denorm_vector[:, 2] = denormalize_list(vector[:, 2], v)  # volume
+    denorm_vector[:, 3] = denormalize_list(vector[:, 3], v)  # ema1
+    denorm_vector[:, 4] = denormalize_list(vector[:, 4], v)  # ema2
 
     return denorm_vector
 

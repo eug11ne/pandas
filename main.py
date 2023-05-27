@@ -5,6 +5,7 @@ from vectors import Vectors
 from tick_vectors import Tick_vectors, plot_nvector_any
 from tick_model import Tick_model
 from training_set import Tick_training_set
+from tick_time import Tick_time, plot_candles
 from tick_correlation import Tick_lags
 
 from dateutil.relativedelta import relativedelta
@@ -14,9 +15,98 @@ import csv
 from datetime import datetime
 from datetime import date
 import matplotlib.pyplot as plt
+print(date.today().weekday())
+factor = 50
+#sber-01012015_25082022.txt
+abc = Vectors.from_file("SBER_220101_230526.csv", v_width=0.005, v_prominence=0.01, add_mean=30, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abv = Vectors.from_file("SBER_220101_230526.csv", v_width=0.02, v_prominence=0.04, add_mean=60, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abg = Vectors.from_file("SBER_220101_230526.csv", v_width=0.1, v_prominence=0.2, add_mean=120, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abf = Vectors.from_file("SBER_220101_230526.csv", v_width=0.2, v_prominence=0.4, add_mean=240, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abv = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=60, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abg = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=120, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abf = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=240, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abc.flat_check()
 
-#abc = Vectors.from_file('SBER_220101_221231.csv', 2, 2)
+
+#abf.plot()
+abc.plot()
+abg.plot()
+abv.plot()
+abf.plot()
+plt.show()
+
+exit()
+
+
+ve = Vectors.from_file("SBER_220101_230526.csv", v_width=0.005*factor, v_prominence=0.01*factor, add_mean=60, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+a1 = ve.fast_predict("gb_model-1step_28_std.pkl", 25, 'std')
+a2 = ve.fast_predict("gb_model-2step_28_std.pkl", 25, 'std')
+a3 = ve.fast_predict("gb_model-3step_28_std.pkl", 25, 'std')
+ve.add(a1,12400,1,1,1)
+ve.add(a2,12400,1,1,1)
+ve.add(a3,12400,1,1,1)
+print(a1, a2, a3)
+ve.plot(divider=ve.length-3)
+plt.show()
+exit()
+
+
+#sber-01012015_25082022.txt - all sber
+abc = Vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=30, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abv = Vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=60, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abg = Vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=120, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abv = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=60, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abg = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=120, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abf = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=240, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abc.flat_check()
+
+
+#abf.plot()
+abc.plot()
+abg.plot()
+abv.plot()
+plt.show()
+
+exit()
+
+abf = Tick_vectors.from_file("SBER_220101_230526.csv", v_width=0.005, v_prominence=0.01, add_mean=30, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+ve = Vectors(abf.vectors, 120, abf.peaks)
+a1 = ve.fast_predict("gb_model-1step_18_std.pkl", 15, 'std')
+a2 = ve.fast_predict("gb_model-2step_18_std.pkl", 15, 'std')
+a3 = ve.fast_predict("gb_model-3step_18_std.pkl", 15, 'std')
+print(a1, a2, a3)
+exit()
+
+trset = Tick_training_set('Sber_vectors_mins-less.csv', 15, 'std')
+trset.create_model()
+exit()
+
+
+trset = Tick_training_set('Sber_vectors_flat.csv', 25, 'std')
+trset.create_model()
+exit()
+
+
+
+abc = Vectors.from_file('SBER_220101_221231.csv', 2, 2)
+abc.fast_predict('gb_model-1step_13_sum.pkl', 10, 'sum')
 #print(abc.vectors)
+a = Tick_time("SBER_210101_211231.csv")
+for i in range(8, 15):
+    a.week(i)
+plt.show()
+exit()
+print(a.find_one(2021, 8, 31, 12))
+
+plot_candles(a.find_range(2021, 8, 23, (10, 19)))
+plot_candles(a.find_range(2021, 8, 24, (10, 19)))
+plot_candles(a.find_range(2021, 8, 25, (10, 19)))
+plot_candles(a.find_range(2021, 8, 26, (10, 19)))
+plot_candles(a.find_range(2021, 8, 27, (10, 19)))
+plt.show()
+#plot_candles(a.find_range(2021, 8, 29, (10, 18)))
+#a.find(hours=(10,12))
+exit()
 
 
 ''' clf = LogisticRegression(max_iter=1000)
@@ -27,30 +117,12 @@ joblib.dump(clf, "model.pkl")
 
 clf2 = joblib.load("model.pkl")
 y_pred = clf2.predict(df_val) '''
-
-gaz = Tick('SBER_190101_191230.csv')
-v_width=3
-sber = Tick_vectors.from_file('SBER_190101_191230.csv', v_width=0.5, v_prominence=1)
-#plt.plot(sber.ema(5*1000))
-#plt.plot(sber.ema(1000))
-plt.plot(sber.ema(int(sber.size/90)))
-plt.plot(sber.ema(int(sber.size/40)))
-plt.plot(sber.price)
-sber.plot()
-plt.show()
-print(int(sber.size/90))
-print(int(sber.size/40))
-
-#gaz.ema(1000)
-#gaz.ema(1000)
-exit()
-
-
 vector_correlation = 0.45
 
 v_width = 0.1
 v_prominence = v_width*2
-trset = Tick_training_set('comb-vectors-20k.csv', 50, 'std', features=5)
+trset = Tick_training_set('ALRSSBER_vectors.csv', 50, 'std')
+#trset = Tick_training_set('5d-vectors-10k.csv', 100, 'std')
 #trset = Tick_training_set('comb-vectors-10k.csv', 20, 'sum2v', features=7)
 # trset = Tick_training_set('all-vectors-10k.csv', 50, 'sum', features=3)
 trset.create_model()

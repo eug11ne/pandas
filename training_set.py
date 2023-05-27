@@ -6,10 +6,10 @@ from tick import cross_validation
 import math
 
 class Tick_training_set():
-    def __init__(self, vectors_file, lag_length, type, features=3):
+    def __init__(self, vectors_file, lag_length, type):
         self.length = lag_length + 3
         self.type = type
-        self.features = features
+        #self.features = features
         with open(vectors_file) as csvfile:
             self.vectors = np.loadtxt(csvfile, delimiter=",")
         print("Vectors loaded: ", self.vectors.shape[0])
@@ -36,6 +36,8 @@ class Tick_training_set():
         norm_vector[:, 0] = normalize_list(vector[:, 0]) #x
         norm_vector[:, 1] = normalize_list(vector[:, 1]) #y
         norm_vector[:, 2] = normalize_list(vector[:, 2]) #volume
+        norm_vector[:, 3] = normalize_list(vector[:, 3]) #ema1
+        norm_vector[:, 4] = normalize_list(vector[:, 4]) #ema2
         return norm_vector
 
     def create_sum(self):
@@ -91,7 +93,8 @@ class Tick_training_set():
         return cut_tr_set(to_model, features=4)
 
     def create_std(self):
-        tr_columns = ['X', 'LEN', 'POWER', 'RATIO', 'Y']
+        tr_columns = ['X', 'LEN', 'EMA1', 'EMA2', 'EMADIFF',  'Y', 'VOL', 'RATIO']
+        features = len(tr_columns)
         to_model = self.prep(tr_columns)
 
         print(to_model)
@@ -99,23 +102,27 @@ class Tick_training_set():
             r_vector = self.vector(i-self.length, self.length)
             li = np.zeros(0)
 
+
             for j in range(self.length):
 
                 x = r_vector[j, 0]
-                #x_prev = r_vector[j - 1, 0]
+                x_prev = r_vector[j - 1, 0] if j>0 else 1
 
                 y = r_vector[j, 1]
-                ratio = x*abs(power) if r_vector[j, 2] > 8 else 0
-                power = r_vector[j, 2]/r_vector[j, 0]
-                len = np.sqrt(x**2 + y**2)
+                ratio = x/abs(x_prev)
+                vol = r_vector[j, 2]
+                length = np.sqrt(x**2 + y**2)
+                ema1 = r_vector[j, 3]
+                ema2 = r_vector[j, 4]
+                emadiff = ema1 - ema2
                 #ratio = x/y #abs(x_prev)
 
-                li = np.append(li, [x, len, power, ratio, y])
+                li = np.append(li, [x, length, ema1, ema2, emadiff, y, vol, ratio])
 
             temp = pd.DataFrame(li.reshape(1, -1), columns=to_model.columns)
             to_model = pd.concat([to_model, temp], ignore_index=True)
 
-        return cut_tr_set(to_model, features=5)
+        return cut_tr_set(to_model, features=features)
 
     def create_sum2v(self):
         tr_columns = ['X', 'SUM1', 'SUM2', 'POWER', 'LEN', 'RATIO', 'Y']
@@ -193,6 +200,11 @@ class Tick_training_set():
         sci_model = XGBRegressor(n_estimators=500, max_depth=14, eta=0.1, subsample=0.9, colsample_bytree=0.7)
         # sci_model = RandomForestRegressor(n_estimators=n_estimators1, max_depth=max_depth1, criterion=criterion1)
         #cross_validation(sci_model, X_train, y1_train)
+
+        #sci_model.fit(X_train, y_y1_train)
+        # joblib.dump(sci_model, f"model-1step-y1_{v_length}.pkl")
+        #print("Model score:", sci_model.score(X_test, y_y1_test))
+
         sci_model.fit(X_train, y1_train)
         joblib.dump(sci_model, f"{model_type}_model-1step_{self.length}_{self.type}.pkl")
 
@@ -209,9 +221,7 @@ class Tick_training_set():
 
         print("Model score:", sci_model.score(X_test, y3_test))
 
-        #sci_model.fit(X_train, y_y1_train)
-        #joblib.dump(sci_model, f"model-1step-y1_{v_length}.pkl")
-        #print("Model score:", sci_model.score(X_test, y_y1_test))
+
 
 
         #sci_model.fit(X_train, y_v1_train)
@@ -261,11 +271,14 @@ def cut_tr_set(to_model, features=3):
     X = to_model.iloc[:, column_numbers]
     print(X)
     y1 = to_model.iloc[:, -features*3]
+    print(y1)
     y2 = to_model.iloc[:, -features*2]
+    print(y2)
     y3 = to_model.iloc[:, -features]
+    print(y3)
     y_y1 = to_model.iloc[:, -features*3+1]
     y_v1 = to_model.iloc[:, -features*3+2]
-    print(y1, y2, y3)
+    #print(y1, y2, y3)
     return X, y1, y2, y3, y_y1, y_v1
 
 

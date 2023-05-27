@@ -7,27 +7,45 @@ import math
 import matplotlib.pyplot as plt
 
 class Tick_vectors(Tick):
-    def __init__(self, data, v_width, v_prominence):
+    def __init__(self, data, v_width, v_prominence, add_mean=None, comb_ratio=None, flat=False):
         self.data = data
+        if add_mean is None:
+            self.price = np.array(self.data['CLOSE'])#.rolling(window=200).mean()) #added averaging here
+            self.size = data.shape[0]
+            self.mean = 30
+
+        else:
+            self.price = np.array(self.data['CLOSE'].rolling(window=add_mean).mean()[add_mean:]) #added averaging here
+            self.size = data.shape[0]-add_mean
+            self.mean = add_mean/3
+        print("min", self.mean)
         self.vol = np.array(self.data['VOL'])
-        self.price = np.array(self.data['CLOSE'])
         self.vol = (self.vol - self.vol.min()) / (self.vol.max() - self.vol.min())
         #super().__init__(file)
         print("Creating Tick_vectors")
-        self.v_prominence = v_prominence
+        if self.price[0] < 0.01:
+            self.v_prominence = self.price[0]/50
+        elif self.price[0] < 2:
+            self.v_prominence = v_prominence / 100
+        else:
+            self.v_prominence = v_prominence
         self.v_width = v_width
         self.peaks = []
         self.vectors = []
+        self.vectors_flat = []
         self.vector_base = []
         self.ema1=self.ema(int(self.size/90))
         self.ema2=self.ema(int(self.size/40))
+        self.comb_ratio = comb_ratio
         self.minmax()
 
+
     @classmethod
-    def from_file(cls, file, v_width, v_prominence):
+    def from_file(cls, file, v_width, v_prominence, add_mean=None, comb_ratio=None, flat=False):
         super().__init__(cls, file)
-        print(cls.ticker)
-        return cls(cls.data, v_width, v_prominence)
+        print(cls.ticker, add_mean)
+
+        return cls(cls.data, v_width, v_prominence, add_mean, comb_ratio, flat)
 
     def vector(self, start, width):
 
@@ -36,6 +54,8 @@ class Tick_vectors(Tick):
         norm_vector[:, 0] = normalize_list(vector[:, 0]) #x
         norm_vector[:, 1] = normalize_list(vector[:, 1]) #y
         norm_vector[:, 2] = normalize_list(vector[:, 2]) #volume
+        norm_vector[:, 3] = normalize_list(vector[:, 3]) #ema1
+        norm_vector[:, 4] = normalize_list(vector[:, 4]) #ema2
 
         return norm_vector
 
@@ -52,10 +72,14 @@ class Tick_vectors(Tick):
         df = pd.DataFrame()
         df['CLOSE'] = self.price
         peaks, _ = find_peaks(df['CLOSE'], prominence=v_prominence , width=v_width, distance=v_width*4000)
+
+        if self.comb_ratio is not None:
+            peaks = self.comb_peaks(peaks, self.comb_ratio)
         #peaks = find_peaks_cwt(df['Close'], np.arange(v_width/2, v_width))
+        print(self.comb_ratio)
         min = np.zeros(len(peaks)-1, dtype=int)
         ii = range(1, len(peaks))
-        vectors = np.zeros([len(peaks)*2 - 1, 3], dtype=float) # -2
+        vectors = np.zeros([len(peaks)*2 - 1, 5], dtype=float) # -2
         for i in ii:
             range1 = int(peaks[i-1])
             range2 = int(peaks[i])
@@ -63,20 +87,33 @@ class Tick_vectors(Tick):
             vectors[i*2 - 2, 0] = self.price[min[i-1]] - self.price[range1]
             vectors[i*2 - 2, 1] = min[i-1] - range1
             vectors[i*2 - 2, 2] = sum(self.vol[range1:min[i-1]])*np.sign(vectors[i*2 - 2, 0])
+            vectors[i * 2 - 2, 3] = self.price[min[i-1]] - self.ema1[min[i-1]]
+            vectors[i * 2 - 2, 4] = self.price[min[i-1]] - self.ema2[min[i-1]]
             vectors[i*2 - 1, 0] = self.price[range2] - self.price[min[i - 1]]
             vectors[i*2 - 1, 1] = range2 - min[i - 1]
             vectors[i*2 - 1, 2] = sum(self.vol[min[i - 1]:range2])*np.sign(vectors[i*2 - 1, 0])
+            vectors[i * 2 - 1, 3] = self.price[range2] - self.ema1[range2]
+            vectors[i * 2 - 1, 4] = self.price[range2] - self.ema2[range2]
 
         vectors[-1, 0] = self.price[-1] - self.price[int(peaks[-1])]
         vectors[-1, 1] = self.price.shape[0] - int(peaks[-1])
-        vectors[-1, 2] = sum(self.vol[int(peaks[-1]):self.price.shape[0]])*np.sign(vectors[-1, 0])
-        vectors[:,2] = vectors[:,2]/np.max(vectors[:,2])*self.price[0]*0.1 #normalizing volume to 10 pct of price
+        vectors[-1, 2] = sum(self.vol[int(peaks[-1]):self.price.shape[0]]) * np.sign(vectors[-1, 0])
+        vectors[-1, 3] = self.price[-1] - self.ema1[-1]
+        vectors[-1, 4] = self.price[-1] - self.ema2[-1]
+        vectors[:, 2] = vectors[:, 2] / np.max(vectors[:, 2]) * self.price[0] * 0.1  # normalizing volume to 10 pct of price
+        if vectors[-1, 0]*vectors[-2, 0] > 0 or vectors[-2, 1]/vectors[-1, 1] > 5 :
+            vectors[-2, 0]+=vectors[-1, 0]
+            vectors[-2, 1]+=vectors[-1, 1]
+            vectors = vectors[:-1]
+
 
         self.mean_len = np.mean(np.abs(vectors[:,1]))
         self.mean_price_move = np.mean(np.abs(vectors[:,0]))
+        self.mean_price = self.price.mean()
         peaks = np.concatenate((peaks, min))
         #print('mean length:', self.data['DATE'][int(self.mean_len)] - self.data['DATE'][0])
         print('mean change:', self.mean_price_move)
+        print('mean price:', self.mean_price)
         print("total vectors:", vectors.shape[0])
 
         self.peaks = np.sort(peaks)
@@ -88,6 +125,128 @@ class Tick_vectors(Tick):
         self.first_peak = self.peaks[0]
 
         return np.sort(peaks), vectors
+
+    def comb_peaks(self, peaks, comb_ratio=0.9):
+        i = 0
+        j = 0
+        n = 0
+
+        #delta = (self.size/peaks.shape[0])
+        delta=self.mean
+        percent=self.mean/50
+        print(self.size, delta, self.mean)
+
+        while j < len(peaks) - 1:
+            if (peaks[j + 1] - peaks[j] < delta) or (abs(self.price[peaks[j + 1]] - self.price[peaks[j]])/self.price[peaks[j]]*100<percent):
+                peaks = np.delete(peaks, j + 1)
+            else:
+                j += 1
+
+
+
+        while i < len(peaks) - 3:
+            if self.comb_check(peaks, i, comb_ratio):
+                peaks = np.delete(peaks, i + 1)
+            else:
+                i += 1
+        flats=0
+
+        while n < len(peaks) - 1:
+            flatnum = self.is_flat(peaks, n, percent*2)
+            if flatnum > 2:
+                peaks = np.delete(peaks, [n+p+1 for p in range(1,flatnum-1)])
+                flats+=1
+                n+=flatnum
+            else:
+                n+=1
+        print("Vectors that are not flat anymore:" , flats)
+
+        return peaks
+
+    def comb_check(self, peaks, i, comb_ratio=1):
+        range1 = int(peaks[i])
+        range2 = int(peaks[i + 1])
+        range3 = int(peaks[i+2])
+        range4 = int(peaks[i+3])
+
+
+        min1 = range1 + np.argmin(self.price[range1:range2])
+        min2 = range2 + np.argmin(self.price[range2:range3])
+        min3 = range3 + np.argmin(self.price[range3:range4])
+        x1 = self.price[min1] - self.price[range1]
+        x2 = self.price[range2] - self.price[min1]
+        x3 = self.price[min2] - self.price[range2]
+        x4 = self.price[range3] - self.price[min2]
+        x5 = self.price[min3] - self.price[range3]
+        x6 = self.price[range4] - self.price[min3]
+
+        #if (abs(x2/x1) < comb_ratio and (abs(x3)*1.1 > abs(x2) or abs(x5)>abs(x4))) or (abs(x3/x2) < comb_ratio and (abs(x4)*1.1 > abs(x3) or abs(x6)>abs(x5))  ):
+        if (abs(x2/x1) < comb_ratio and (abs(x3)*1.1 > abs(x2))) or (abs(x3/x2) < comb_ratio and (abs(x4)*1.1 > abs(x3))):
+            return True
+        else:
+            return False
+
+    def is_flat(self, peaks, i, tolerance):
+
+        tolerance_percentage = tolerance
+        k = 1
+        not_flat = True
+        while not_flat and i + k < len(peaks):
+            corr = (self.price[peaks[i]] - self.price[peaks[i + k]]) / self.price[peaks[i]] * 100
+            if np.abs(corr) < tolerance_percentage:
+                k = k + 1
+            else:
+                not_flat = False
+        return k
+
+
+    def flat_check(self):
+        i=1
+        vectors_flat = self.vectors.copy()
+        tolerance_percentage = self.mean_price_move / self.price.min() * 100
+        ks = []
+        while i < len(self.peaks-3):
+            not_flat = True
+            k=1
+            delta = 0
+            delta_len = 0
+            delta_vol = 0
+            #print(self.peaks[i],  self.price[self.peaks[i]])
+            while not_flat and i+k<len(self.peaks):
+                corr = (self.price[self.peaks[i]]-self.price[self.peaks[i+k]])/self.price[self.peaks[i]]*100
+                if np.abs(corr) < tolerance_percentage:
+                    #print(corr, self.price[self.peaks[i]], self.price[self.peaks[i+k]], self.vectors[i+k-1])
+                    k = k + 1
+                else:
+                    not_flat=False
+
+            if k > 3:
+                for m in range(k):
+                    source_val = self.vectors[i, 0]
+                    delta += self.vectors[i + m, 0]
+                    #delta_len += self.vectors[i + m, 1]
+                    vectors_flat[i + m, 0] = 0
+                    if m > 0 and m < k-1:
+                        ks.append(i + m)
+                        delta_len += self.vectors[i + m, 1]
+                        delta_vol += abs(self.vectors[i + m, 2])
+
+            i += k
+            vectors_flat[i-1, 0] += delta
+            vectors_flat[i-k, 1] += delta_len
+            vectors_flat[i-k, 2] += delta_vol
+
+        vectors_flat = np.delete(vectors_flat, ks, 0)
+        self.peaks = np.delete(self.peaks, ks, 0)
+        print("Total flattened vectors:", vectors_flat.shape[0])
+        plot_nvector_any(vectors_flat)
+        #return vectors_flat
+
+
+
+
+
+
 
 
     def save_vectors(self, file):
