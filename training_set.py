@@ -96,6 +96,7 @@ class Tick_training_set():
         tr_columns = ['X', 'LEN', 'EMA1', 'EMA2', 'EMADIFF',  'Y', 'VOL', 'RATIO']
         features = len(tr_columns)
         to_model = self.prep(tr_columns)
+        to_model_minus = self.prep(tr_columns)
 
         print(to_model)
         for i in range(self.length, self.vectors.shape[0] - self.length):
@@ -120,7 +121,8 @@ class Tick_training_set():
                 li = np.append(li, [x, length, ema1, ema2, emadiff, y, vol, ratio])
 
             temp = pd.DataFrame(li.reshape(1, -1), columns=to_model.columns)
-            to_model = pd.concat([to_model, temp], ignore_index=True)
+            if temp[f'X_{self.length-4}'][0]>0:
+                to_model = pd.concat([to_model, temp], ignore_index=True)
 
         return cut_tr_set(to_model, features=features)
 
@@ -221,17 +223,73 @@ class Tick_training_set():
 
         print("Model score:", sci_model.score(X_test, y3_test))
 
+        #sci_model.fit(X_train, y_y1_train)
+        #joblib.dump(sci_model, f"{model_type}_model-time_{self.length}_{self.type}.pkl")
+
+        #print("Model score:", sci_model.score(X_test, y_y1_test))
 
 
-
-        #sci_model.fit(X_train, y_v1_train)
-        #joblib.dump(sci_model, f"model-1step-v1_{v_length}.pkl")
-        #print("Model score:", sci_model.score(X_test, y_v1_test))
-
-        # plt.plot(y_pred)
         print("end model")
 
         return 0
+
+    def create_nn(self):
+
+        X_train, price1_train, price2_train, price3_train, X_test, price1_test, price2_test, price3_test = self.split_training_set()
+        print("********************************************")
+
+        self.train_nn(X_train, price1_train, X_test, price1_test, 1)
+        #self.train_nn(X_train, price2_train, X_test, price2_test, 2)
+        #self.train_nn(X_train, price3_train, X_test, price3_test, 3)
+
+
+    def train_nn(self, X, Y, X_test, Y_test, step):
+        from keras.models import Sequential
+        from keras.layers import Dense, Dropout
+        from sklearn.metrics import mean_absolute_error, mean_squared_error, explained_variance_score
+        model = Sequential()
+        print("NUMBER OF string, columns", X.shape)
+        model.add(Dense(X.shape[1], activation="relu"))
+        model.add(Dense(X.shape[1] + 10, activation="relu"))
+        model.add(Dropout(0.2))
+        model.add(Dense(X.shape[1] + 20, activation="relu"))
+        model.add(Dropout(0.2))
+        model.add(Dense(X.shape[1] + 30, activation="relu"))
+        model.add(Dropout(0.2))
+        model.add(Dense(X.shape[1] + 20, activation="relu"))
+        model.add(Dropout(0.2))
+        model.add(Dense(X.shape[1] + 10, activation="relu"))
+        model.add(Dropout(0.2))
+        model.add(Dense(X.shape[1], activation="relu"))
+        model.add(Dropout(0.2))
+        model.add(Dense(1))
+        model.compile(optimizer="adam", loss="mse")
+        model.fit(x=X, y=Y, batch_size=256, epochs=300, validation_data=(X_test, Y_test))
+
+        predictions = model.predict(X_test)
+        print(predictions)
+        print("The absolute mean error :", mean_absolute_error(Y_test, predictions))
+        print("The squared mean error :", mean_squared_error(Y_test, predictions))
+        print("The squared mean error :", np.sqrt(mean_squared_error(Y_test, predictions)))
+        model.save(f"keras_{step}step_{self.length}_std.nnn", save_format="h5")
+
+
+    def split_training_set(self):
+        train_len = self.vectors.shape[0] - int(self.vectors.shape[0] / 10)
+        test_len = -(int(self.vectors.shape[0] / 10))
+        X_train = self.X[:train_len]
+        price1_train = self.y1[:train_len]
+        price2_train = self.y2[:train_len]
+        price3_train = self.y3[:train_len]
+        y_y1_train = self.y_y1[:train_len]
+        y_v1_train = self.y_v1[:train_len]
+        X_test = self.X[test_len:]
+        price1_test = self.y1[test_len:]
+        price2_test = self.y2[test_len:]
+        price3_test = self.y3[test_len:]
+        y_y1_test = self.y_y1[test_len:]
+        y_v1_test = self.y_v1[test_len:]
+        return X_train, price1_train, price2_train, price3_train, X_test, price1_test, price2_test, price3_test
 
     def find_best_model(self):
         from sklearn.ensemble import RandomForestRegressor

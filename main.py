@@ -1,7 +1,7 @@
 import pandas as pd
 
 from tick import Tick, load_vectors
-from vectors import Vectors
+from vectors import Vectors, temp_pred
 from tick_vectors import Tick_vectors, plot_nvector_any
 from tick_model import Tick_model
 from training_set import Tick_training_set
@@ -11,17 +11,103 @@ from tick_correlation import Tick_lags
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import rrule, MONTHLY, DAILY, WEEKLY
 import numpy as np
+from keras.models import Sequential
+from keras.layers import Dense
+import keras
 import csv
 from datetime import datetime
 from datetime import date
 import matplotlib.pyplot as plt
 print(date.today().weekday())
 factor = 50
+#lens = [5, 7, 10, 15, 20, 25]
+lens = [10]
+
+for i in lens:
+    print("i", i)
+    trset = Tick_training_set('Sbergazp_vectors.csv', i, 'std')
+    trset.create_nn()
+exit()
+ve1 = Vectors.from_file("SBER_220101_230526.csv", add_mean=60, comb_ratio=0.9)#.slice(0,-1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+stb = 63
+temp_pred(ve1, 20, stb, nn=True)
+temp_pred(ve1, 25, stb, nn=True)
+temp_pred(ve1, 15, stb, nn=True)
+temp_pred(ve1, 10, stb, nn=True)
+#temp_pred(ve1, 7, stb, nn=True)
+#temp_pred(ve1, 3, stb, nn=True)
+#temp_pred(ve1, 25, stb, nn=True)
+#temp_pred(ve1, 20, stb, nn=False)
+temp_pred(ve1, 15, stb, nn=False)
+#for p in range(5):
+ #   temp_pred(ve1, 20, p, nn=True)
+#a1 = ve1.fast_predict("keras_13.nnn", 10, 'std', nn=True)
+#ve1.add(a1,12400,1,1,1)
+#print(a1)
+#ve1.plot(divider=ve1.length-1)
+ve1.plot()
+plt.show()
+
+
+
+exit()
+ve = Vectors.from_file("SBER_220101_230526.csv", add_mean=240, comb_ratio=0.9)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#temp_pred(ve, 15, 0)
+for p in range(10):
+    temp_pred(ve, 3, p)
+#temp_pred(ve, 15, 1)
+#temp_pred(ve, 15, 2)
+#temp_pred(ve, 15, 3)
+#temp_pred(ve, 15, 4)
+#temp_pred(ve, 15, 5)
+#temp_pred(ve, 15, 7)
+
+ve.plot()
+plt.show()
+exit()
+
+ve1 = Vectors.from_file("SBER_220101_230526.csv", add_mean=500, comb_ratio=0.9).slice(0,-1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+a1 = ve1.fast_predict("gb_model-1step_12_std.pkl", 9, 'std')
+a2 = ve1.fast_predict("gb_model-2step_12_std.pkl", 9, 'std')
+a3 = ve1.fast_predict("gb_model-3step_12_std.pkl", 9, 'std')
+ve1.add(a1,12400,1,1,1)
+ve1.add(a2,12400,1,1,1)
+ve1.add(a3,12400,1,1,1)
+
+ve2 = Vectors.from_file("SBER_220101_230526.csv", add_mean=500, comb_ratio=0.9).slice(0,-1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+a12 = ve2.fast_predict("gb_model-1step_10_std.pkl", 7, 'std')
+a22 = ve2.fast_predict("gb_model-2step_10_std.pkl", 7, 'std')
+a32 = ve2.fast_predict("gb_model-3step_10_std.pkl", 7, 'std')
+ve2.add(a12,12400,1,1,1)
+ve2.add(a22,12400,1,1,1)
+ve2.add(a32,12400,1,1,1)
+
+print(a1, a2, a3)
+ve.plot()
+ve1.plot(divider=ve1.length-3)
+ve2.plot(divider=ve1.length-3)
+plt.show()
+exit()
+
+steps = [5, 7, 9, 15, 20]
+
+for i in steps:
+    trset = Tick_training_set('Sbergazp_vectors.csv', i, 'std')
+    trset.create_model()
+exit()
+
+trset = Tick_training_set('Sber_vectors_mins-less.csv', 25, 'std')
+trset.create_model()
+exit()
+
+
+factor = 50
 #sber-01012015_25082022.txt
-abc = Vectors.from_file("SBER_220101_230526.csv", v_width=0.005, v_prominence=0.01, add_mean=30, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
-abv = Vectors.from_file("SBER_220101_230526.csv", v_width=0.02, v_prominence=0.04, add_mean=60, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
-abg = Vectors.from_file("SBER_220101_230526.csv", v_width=0.1, v_prominence=0.2, add_mean=120, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
-abf = Vectors.from_file("SBER_220101_230526.csv", v_width=0.2, v_prominence=0.4, add_mean=240, comb_ratio=1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abc = Vectors.from_file("SBER_220101_230526.csv", add_mean=30, comb_ratio=0.9)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abv = Vectors.from_file("SBER_220101_230526.csv", add_mean=60, comb_ratio=0.9)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+#abv = Vectors.from_file("SBER_220101_230526.csv", v_width=0.02, v_prominence=0.04, add_mean=60, comb_ratio=0.5)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abg = Vectors.from_file("SBER_220101_230526.csv", add_mean=120, comb_ratio=0.9)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+abf = Vectors.from_file("SBER_220101_230526.csv", add_mean=240, comb_ratio=0.9)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
 #abv = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=60, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
 #abg = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=120, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
 #abf = Tick_vectors.from_file("sber-01012015_25082022.txt", v_width=0.005, v_prominence=0.01, add_mean=240, comb_ratio=1, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
@@ -376,11 +462,6 @@ plt.show()
 #mm = sber.turning_points(peaks)
 #mm.plot()
 #plt.show()
-
-
-
-
-
 
 # sber.save4prophet()
 #sber1 = np.genfromtxt('SBER.csv', delimiter=';')

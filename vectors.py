@@ -23,7 +23,7 @@ class Vectors():
         print("Initial price: ", init_price)
 
     @classmethod
-    def from_file(cls, file, v_width, v_prominence, add_mean=60, comb_ratio=None):
+    def from_file(cls, file, v_width=0.005, v_prominence=0.01, add_mean=60, comb_ratio=None):
         tvectors = Tick_vectors.from_file(file, v_width, v_prominence, add_mean, comb_ratio)
         print("from V:", add_mean)
         first_price = tvectors.price[int(tvectors.peaks[0])]
@@ -155,7 +155,7 @@ class Vectors():
 
 
 
-    def plot(self, width=1, rgb=(), divider=0):
+    def plot(self, width=1, rgb=(), divider=0, label=None):
         x = self.init_price
         y = 0
 
@@ -164,6 +164,7 @@ class Vectors():
 
         if not rgb:
             rgb = (random.random(), random.random(), random.random())
+            temp_label = None
 
         for i in range(self.vectors.shape[0]):
 
@@ -173,11 +174,17 @@ class Vectors():
             y = y + self.vectors[i, 1]
             plt.plot(y1, x1, color=rgb)
             #ax.plot(y1, x1, color=rgb)
-            plt.plot(yv, xv, color=rgb)
+            if i == self.vectors.shape[0]-1:
+                temp_label=label
+            plt.plot(yv, xv, color=rgb, label=temp_label)
             #ax.plot(yv, xv, color=rgb)
             if i > 1 and i > divider - 1 and divider != 0:
                 plt.plot(y1, x1, "xr")
                 #ax.plot(y1, x1, "xr")
+
+
+
+
 
     def plot_html(self, width=1, rgb=(), divider=0):
         import io
@@ -210,9 +217,13 @@ class Vectors():
         pngImageB64String += base64.b64encode(pngImage.getvalue()).decode('utf8')
         return pngImageB64String
 
-    def fast_predict(self, model_file_name, lag_length=10, mode='std'):
+    def fast_predict(self, model_file_name, lag_length=10, mode='std', nn=False):
         import joblib
-        sci_model = joblib.load(model_file_name)
+        import keras
+        if not nn:
+            sci_model = joblib.load(model_file_name)
+        else:
+            sci_model = keras.models.load_model(model_file_name)
         if mode == 'cos':
             X_p, x_m = self.vector_to_predict_cos(lag_length)
 
@@ -446,3 +457,18 @@ def prep(features, lag_length=10):
             # to_model[f'{f}_{j}'] = []
     to_model = pd.DataFrame(columns=names)
     return to_model
+
+def temp_pred(vector, model_step, step_back, nn=False):
+    modelfile1 = f"gb_model-1step_{model_step+3}_std.pkl" if not nn else f"keras_1step_{model_step+3}_std.nnn"
+    modelfile2 = f"gb_model-2step_{model_step+3}_std.pkl" if not nn else f"keras_2step_{model_step+3}_std.nnn"
+    modelfile3 = f"gb_model-3step_{model_step+3}_std.pkl" if not nn else f"keras_3step_{model_step+3}_std.nnn"
+    ve1 = vector.slice(0, -step_back) if step_back > 0 else vector
+    a1 = ve1.fast_predict(modelfile1, model_step, 'std', nn)
+    a2 = ve1.fast_predict(modelfile2, model_step, 'std', nn)
+    a3 = ve1.fast_predict(modelfile3, model_step, 'std', nn)
+    mean_len = vector.vectors[:,1].mean()
+    ve1.add(a1, mean_len, 1, 1, 1)
+    ve1.add(a2, mean_len, 1, 1, 1)
+    ve1.add(a3, mean_len, 1, 1, 1)
+    ve1.plot(divider=ve1.length - 3, label=modelfile1)
+    plt.legend()

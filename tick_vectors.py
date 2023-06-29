@@ -7,7 +7,7 @@ import math
 import matplotlib.pyplot as plt
 
 class Tick_vectors(Tick):
-    def __init__(self, data, v_width, v_prominence, add_mean=None, comb_ratio=None, flat=False):
+    def __init__(self, data, v_width=0.005, v_prominence=0.01, add_mean=None, comb_ratio=None, flat=False):
         self.data = data
         if add_mean is None:
             self.price = np.array(self.data['CLOSE'])#.rolling(window=200).mean()) #added averaging here
@@ -17,7 +17,9 @@ class Tick_vectors(Tick):
         else:
             self.price = np.array(self.data['CLOSE'].rolling(window=add_mean).mean()[add_mean:]) #added averaging here
             self.size = data.shape[0]-add_mean
-            self.mean = add_mean/3
+            self.mean = add_mean/2 #div by 3
+            v_width = v_width*add_mean/30
+            v_prominence = v_width*2
         print("min", self.mean)
         self.vol = np.array(self.data['VOL'])
         self.vol = (self.vol - self.vol.min()) / (self.vol.max() - self.vol.min())
@@ -41,7 +43,7 @@ class Tick_vectors(Tick):
 
 
     @classmethod
-    def from_file(cls, file, v_width, v_prominence, add_mean=None, comb_ratio=None, flat=False):
+    def from_file(cls, file, v_width=0.005, v_prominence=0.01, add_mean=None, comb_ratio=None, flat=False):
         super().__init__(cls, file)
         print(cls.ticker, add_mean)
 
@@ -126,14 +128,14 @@ class Tick_vectors(Tick):
 
         return np.sort(peaks), vectors
 
-    def comb_peaks(self, peaks, comb_ratio=0.9):
+    def comb_peaks(self, peaks, comb_ratio=0.7):
         i = 0
         j = 0
         n = 0
 
         #delta = (self.size/peaks.shape[0])
-        delta=self.mean
-        percent=self.mean/50
+        delta=self.mean*10 #to change vector length
+        percent=self.mean/20
         print(self.size, delta, self.mean)
 
         while j < len(peaks) - 1:
@@ -166,8 +168,8 @@ class Tick_vectors(Tick):
     def comb_check(self, peaks, i, comb_ratio=1):
         range1 = int(peaks[i])
         range2 = int(peaks[i + 1])
-        range3 = int(peaks[i+2])
-        range4 = int(peaks[i+3])
+        range3 = int(peaks[i + 2])
+        range4 = int(peaks[i + 3])
 
 
         min1 = range1 + np.argmin(self.price[range1:range2])
