@@ -21,9 +21,6 @@ class Tick():
         print('Extracted: ' + self.data.iloc[0]['TICKER'])
         self.data.drop(columns=['TICKER', 'PER', 'DATE', 'TIME'], inplace=True)
 
-        #self.start = self.data['DATETIME'].iloc[0]
-        #self.end = self.data['DATETIME'].iloc[-1]
-
         self.target_correlation = 0.85
 
         self.data.set_index('DATETIME', inplace=True)#, drop=False)
@@ -32,6 +29,7 @@ class Tick():
         self.end = self.data.index[-1]
         print('Total entries here:', self.size)
         print(self.start, self.end)
+        self.data['CLOSE'] = (self.data['CLOSE']-self.data['CLOSE'].min())*100/(self.data['CLOSE'].max()+self.data['CLOSE'].min())
 
         #self.meanvol = self.data.resample("M").mean()['VOL']
         #self.dayvol = self.data.groupby(self.data.index.minute).mean()['VOL']
@@ -108,7 +106,13 @@ class Tick():
             ema[j]=np.average(self.price[:j])
         for i in range(len, self.size):
             ema[i]=alfa*self.price[i] + (1-alfa)*ema[i-1]
-        return ema
+        derivated_ema = np.gradient(ema)
+        second_derivated_ema = np.gradient(derivated_ema)
+        second_derivated_ema1 = second_derivated_ema/np.abs(second_derivated_ema).max() #/np.abs(second_derivated_ema).mean()
+        derivated_ema1 = derivated_ema/np.abs(derivated_ema).max() #np.abs(derivated_ema).mean()
+        print("EMA stuff", derivated_ema1.max(), derivated_ema1.min(), derivated_ema1.mean(), second_derivated_ema1.max(), second_derivated_ema1.min(), second_derivated_ema1.mean())
+
+        return ema, derivated_ema1, second_derivated_ema1
 
 
 

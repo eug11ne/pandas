@@ -20,37 +20,208 @@ from datetime import date
 import matplotlib.pyplot as plt
 print(date.today().weekday())
 factor = 50
-#lens = [5, 7, 10, 15, 20, 25]
-lens = [10]
 
-for i in lens:
-    print("i", i)
-    trset = Tick_training_set('Sbergazp_vectors.csv', i, 'std')
-    trset.create_nn()
+
+
+
+
+
+#filename='GAZP_big_training_set.csv'
+filename='SBER_200101_201231.csv'
+#filename='SBER_220101_230526.csv'
+#filename = 'NVTK_all_data.csv'
+#abc = Tick_vectors.from_file(filename, add_mean=5, ema=(250,1500))
+#for i in abc.diff_ema1:
+#    print(i)
+#print(abc.diff_ema1.max())
+#print(abc.diff_ema1.min())
+#plt.plot(abc.ema2)
+#plt.plot(abc.ema1)
+#plt.plot(abc.diff_ema2)
+#plt.plot(abc.diff_ema1)
+
+#abc.plot()
+
+#plt.show()
+#print(abc.vectors)
+#exit()
+
+#lens = [5, 7, 15, 20, 25]
+# 20-2, 30-2. 30-3
+#filename='Sber5_250_1500.vec'
+#filename='Sber10_250_1500.vec'
+#filename='Sber15_250_1500.vec'
+
+columns2 = [['X', 'TIME', 'LEN', 'RATIO', 'SIN', 'VOLX', 'VOL', 'TOEMA1', 'TOEMA2', 'EMADIFF', 'EMA1', 'EMA2', 'DIFF1', 'DIFF2', 'DDIFF1', 'DDIFF2'],
+['X', 'TIME', 'LEN', 'RATIO', 'SIN', 'VOLX', 'VOL', 'TOEMA1', 'TOEMA2', 'EMADIFF', 'EMA1', 'EMA2', 'DIFF1', 'DIFF2'],
+['X', 'TIME', 'LEN', 'RATIO', 'SIN', 'VOLX', 'VOL', 'TOEMA1', 'TOEMA2', 'EMADIFF', 'EMA1', 'EMA2'],
+['X', 'TIME', 'LEN', 'RATIO', 'SIN', 'VOLX', 'VOL', 'TOEMA1', 'TOEMA2', 'EMADIFF'],
+['X', 'TIME', 'LEN', 'RATIO', 'SIN', 'VOLX', 'VOL', 'EMA1', 'EMA2'],
+['X', 'TIME', 'LEN', 'RATIO', 'SIN', 'VOLX', 'VOL'],
+['X', 'TIME', 'LEN', 'RATIO', 'SIN', 'VOLX'],
+['X', 'TIME', 'RATIO', 'SIN', 'VOLX'],
+['X', 'RATIO', 'SIN', 'VOLX'],
+['X', 'RATIO', 'SIN', 'VOL'],
+['X', 'RATIO', 'SIN']]
+notbad = [['X', 'DELTAX', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'VOL', 'VOLX', 'SUM'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'VOL', 'VOLX'],
+['X', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF'],
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF'], #not bad at 15
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'DELTADIFF', 'VOLX'],
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],
+['X', 'DELTAX', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],# 47 bigs, 5.2, more bigs but less coefficient compared to +LEN
+['X', 'DELTAX', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'VOLX'],
+['X', 'DELTAX', 'LEN', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOL'] #39 bigs, 5.5
+
+            ]
+
+columns = [['X', 'DELTAX', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],
+    ['X', 'DELTAX', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'VOL', 'VOLX', 'SUM'],
+    ['X', 'DELTAX', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],
+['X', 'DELTAX', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],# 47 bigs, 5.2, more bigs but less coefficient compared to +LEN
+['X', 'DELTAX', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'VOLX'],
+['X', 'DELTAX', 'LEN', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],
+['X', 'SIN', 'RATIO', 'EMADIFF','VOL'],
+['X', 'SIN', 'RATIO', 'EMADIFF','VOLX'],
+['X', 'DELTAX', 'LEN', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOL', 'DELTADDIFF'],
+['X', 'DELTAX', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOLX', 'DELTADDIFF'],
+['X', 'DELTAX', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'VOLX'],
+['X', 'DELTAX', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],
+['X', 'DELTAX', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'VOLX', 'EMA2'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMA1', 'EMA2','VOL'],
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'VOL'],
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'VOLX'],
+['X', 'DELTAX', 'LEN', 'TIME', 'SIN', 'RATIO', 'DELTADDIFF', 'VOL'],
+['X', 'DELTAX', 'LEN', 'TIME', 'SIN', 'RATIO', 'EMADIFF', 'DELTADDIFF', 'VOL'],
+['X', 'DELTAX', 'TIME', 'SIN', 'RATIO', 'EMADIFF','VOL', 'VOLX'],
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF'],
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'DELTADIFF', 'VOLX'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'VOLX', 'EMADIFF'],
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'DELTADIFF', 'VOLX'],
+['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF', 'DELTADIFF'],
+#['X', 'TIME', 'DELTAX', 'LEN', 'RATIO', 'SIN', 'VOLX', 'VOL', 'TOEMA1', 'TOEMA2', 'EMADIFF', 'EMA1', 'EMA2', 'DIFF1', 'DIFF2', 'DDIFF1', 'DDIFF2', 'DELTADIFF', 'DELTADDIFF'],
+#['X', 'DELTAX', 'TIME', 'LEN', 'SIN', 'RATIO', 'EMADIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'VOL', 'EMADIFF', 'DELTADIFF', 'DELTADDIFF'], #,'SUM'],#, 'VOL'], 'EMADIFF', 'RATIO', 'VOL', 'VOLX', 'SUM',
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADDIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADDIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADDIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADDIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADDIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADDIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADDIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADIFF', 'DELTADDIFF'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADIFF', 'VOLX'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DELTADIFF', 'VOL'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DIFF1'],
+['X', 'DELTAX', 'SIN', 'RATIO', 'EMADIFF', 'DIFF2'],
+['X', 'DELTAX', 'SIN'],
+['X', 'LEN', 'VOL'],
+['X', 'TIME', 'LEN', 'VOL'],
+['X', 'EMA1', 'EMA2'],
+['X', 'DELTAX', 'EMA1', 'EMA2'],
+['X', 'EMA1', 'EMA2', 'EMADIFF'],
+['X', 'EMA1', 'EMA2', 'SIN'],
+['X', 'EMA1', 'EMA2', 'SIN', 'DELTAX'],
+['X', 'EMA1', 'EMA2', 'SIN', 'DELTAX', 'RATIO'],
+['X', 'EMA1', 'EMA2', 'SIN', 'DIFF1', 'DIFF2'],
+['X', 'EMA1', 'EMA2', 'SIN', 'DELTAX', 'RATIO', 'DIFF1', 'DIFF2']
+#['X', 'DELTAX', 'RATIO', 'EMA1', 'EMA2', 'SIN'],
+#['X', 'TIME', 'DELTAX', 'RATIO', 'EMA1', 'EMA2', 'SIN'],
+#['X', 'TIME', 'EMA1', 'EMA2', 'SIN']
+            ]
+
+
+#filename='Sbergazp_vectors.csv'
+lens = [17]#, 20, 20, 20]#, 15, 15]#, 20, 20]#, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]#, 20, 20]#15, 16, 17, 18, 19, 20, 21, 22, 23]
+nns = [(4, 4)]#, (5, 6), (5, 6), (5, 6)]#, (4, 3), (4, 3)]#, (3, 3), (3, 3)]#, (3, 4),(3, 4), (3, 4), (3, 4), (3, 4), (3, 4), (3, 4), (3, 4), (3, 4)]#, (8,3), (7,6)]#, (5,3), (5,3), (5,3), (5,3)]
+mins = 5
+#filename=f'Sber{mins}_250_1500.vec'
+filename='Sber5_300_15000.vec'
+train=True
+cum_pred = []
+preds = []
+ytest = []
+#train=False
+model_number=0
+if train:
+    for i, nn in zip(lens, nns):
+        print("i", i)
+        trset = Tick_training_set(filename, i, 'simple', steps=3, nn=nn, columns=columns[model_number]) #Sbergazp_vectors.csv Sber_vectors.vec
+        #trset = Tick_training_set(filename, i, 'all') #Sbergazp_vectors.csv Sber_vectors.vec
+        preds, ytest = trset.create_nn(model_number=model_number, mins=mins, lstm=True)
+        cum_pred = cum_pred + preds
+        model_number+=1
+        #trset.create_model()
+else:
+
+    ve1 = Vectors.from_file("SBER_220101_230629.csv", add_mean=70, comb_ratio=0.9)#.slice(0,-1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
+    stb = 1
+    temp_pred(ve1, 15, stb, 'simple', nn=True, model_number=2)
+    ve1.plot()
+    plt.show()
+
+''' cum_pred = [i/(len(lens)) for i in cum_pred]
+right_direction=0
+wrong_direction=0
+good_guess=0
+norm_guess=0
+for i, j in zip(cum_pred, ytest):#Y_test.to_numpy().T):
+    print(f"predicted: {i}, actual: {j}")
+    if i*j>0:
+        right_direction+=1
+    else:
+        wrong_direction+=1
+    if abs(j-i) < 0.1:
+        good_guess+=1
+    elif abs(j-i) < 0.2:
+        norm_guess+=1
+print(f"Good ones: {good_guess}, ok ones: {norm_guess}, right direction guess: {right_direction}, wrong direction guess: {wrong_direction}, coefficient: {right_direction/wrong_direction}")
+'''
 exit()
-ve1 = Vectors.from_file("SBER_220101_230526.csv", add_mean=60, comb_ratio=0.9)#.slice(0,-1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
-stb = 63
-temp_pred(ve1, 20, stb, nn=True)
-temp_pred(ve1, 25, stb, nn=True)
-temp_pred(ve1, 15, stb, nn=True)
-temp_pred(ve1, 10, stb, nn=True)
-#temp_pred(ve1, 7, stb, nn=True)
-#temp_pred(ve1, 3, stb, nn=True)
-#temp_pred(ve1, 25, stb, nn=True)
-#temp_pred(ve1, 20, stb, nn=False)
-temp_pred(ve1, 15, stb, nn=False)
-#for p in range(5):
- #   temp_pred(ve1, 20, p, nn=True)
-#a1 = ve1.fast_predict("keras_13.nnn", 10, 'std', nn=True)
-#ve1.add(a1,12400,1,1,1)
-#print(a1)
-#ve1.plot(divider=ve1.length-1)
-ve1.plot()
-plt.show()
 
 
 
+ve2 = Vectors.from_file("SBER_220101_230629.csv", add_mean=15)
+lens = [20]
+preds = []
+all_deltas=[]
+answers = []
+deltas = []
+
+for len in lens:
+    preds = []
+
+    avgs = []
+
+    for i in range(50, 74):
+        ve1 = ve2.slice(0,i)
+        #pred1 = ve1.fast_predict(f"keras_1step_{len}_simple_1.nnn", len, 'simple', nn=True)
+        pred1 = ve1.fast_predict(f"keras_1step_{len}_mins15_1.nnn", len, 'simple', nn=True)
+        pred6 = ve2.right_answer(i,3)
+        delta = pred6 - pred1[0][0]
+        deltas.append(f'{len}: {pred1[0][0]}, {pred6}, {delta}')
+
+        avgs.append(delta)
+        all_deltas.append(delta)
+    deltas.append(f'Mean delta for {len}: {np.abs(np.array(avgs)).mean()}')
+
+for j in deltas:
+    print(j)
+
+print('total delta: ', np.abs(np.array(all_deltas)).mean())
 exit()
+
+
+
+
+
+
+
+
+
 ve = Vectors.from_file("SBER_220101_230526.csv", add_mean=240, comb_ratio=0.9)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)
 #temp_pred(ve, 15, 0)
 for p in range(10):
@@ -64,6 +235,13 @@ for p in range(10):
 
 ve.plot()
 plt.show()
+a1 = ve.fast_predict("keras_1step_13_simple_plus.nnn", 10, 'simple', nn=True)
+a2 = ve.fast_predict("keras_2step_13_simple_plus.nnn", 10, 'simple', nn=True)
+a3 = ve.fast_predict("keras_3step_13_simple_plus.nnn", 10, 'simple', nn=True)
+print(a1, a2, a3)
+
+
+
 exit()
 
 ve1 = Vectors.from_file("SBER_220101_230526.csv", add_mean=500, comb_ratio=0.9).slice(0,-1)#, flat=True)#, , add_mean=50, comb_ratio=1, add_mean=10comb_ratio=0.9,add_mean=100)#, comb_ratio=0.9, add_mean=200)

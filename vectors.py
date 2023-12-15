@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 from tick_vectors import Tick_vectors
+from training_set import simple_prep
 
 
 class Vectors():
@@ -23,8 +24,8 @@ class Vectors():
         print("Initial price: ", init_price)
 
     @classmethod
-    def from_file(cls, file, v_width=0.005, v_prominence=0.01, add_mean=60, comb_ratio=None):
-        tvectors = Tick_vectors.from_file(file, v_width, v_prominence, add_mean, comb_ratio)
+    def from_file(cls, file, v_width=0.005, v_prominence=0.01, add_mean=60, ema=(250,1500)):
+        tvectors = Tick_vectors.from_file(file, v_width, v_prominence, add_mean, ema)
         print("from V:", add_mean)
         first_price = tvectors.price[int(tvectors.peaks[0])]
         #cls.last_price = tvectors.price[int(tvectors.peaks[-1])]
@@ -70,6 +71,14 @@ class Vectors():
         #return norm_vector[:,:3]
         return Vectors(vector, price, peaks)
 
+    def right_answer(self, start, width):
+        price = 0#self.init_price
+        for i in range(start, start+width):
+            price += self.vectors[i,0]
+
+        return price
+
+
     def normalize(self):
         norm_vector = np.empty_like(self.vectors)
         # print('vector', vector[:,0], vector[:,1], vector[:,2])
@@ -78,6 +87,11 @@ class Vectors():
         norm_vector[:, 2], self.v_max = normalize_list(self.vectors[:, 2])#volume
         norm_vector[:, 3], self.ema1_max = normalize_list(self.vectors[:, 3])# ema1
         norm_vector[:, 4], self.ema2_max = normalize_list(self.vectors[:, 4])# ema2
+        norm_vector[:, 5] = self.vectors[:, 5] #sin
+        norm_vector[:, 6] = self.vectors[:, 6] #diff-ema1
+        norm_vector[:, 7] = self.vectors[:, 7] #diff-ema2
+        norm_vector[:, 8] = self.vectors[:, 8] #diff2-ema1
+        norm_vector[:, 9] = self.vectors[:, 9] #diff2-ema2
 
         return norm_vector
 
@@ -220,10 +234,7 @@ class Vectors():
     def fast_predict(self, model_file_name, lag_length=10, mode='std', nn=False):
         import joblib
         import keras
-        if not nn:
-            sci_model = joblib.load(model_file_name)
-        else:
-            sci_model = keras.models.load_model(model_file_name)
+
         if mode == 'cos':
             X_p, x_m = self.vector_to_predict_cos(lag_length)
 
@@ -238,7 +249,19 @@ class Vectors():
 
         elif mode == 'std':
             X_p, x_m = self.vector_to_predict_std(lag_length)
-        pred = sci_model.predict(X_p)*x_m/10
+        elif mode == 'simple':
+            X_p, x_m = self.vector_to_predict_simple(lag_length)
+            features = 6
+
+        if not nn:
+            sci_model = joblib.load(model_file_name)
+        else:
+            sci_model = keras.models.load_model(model_file_name)
+
+        #X_pn = X_p#.to_numpy().reshape(1, lag_length, 6)
+        X_pn = X_p.to_numpy()#.reshape(1, lag_length, 12)
+
+        pred = sci_model.predict(X_pn)*x_m
         return pred
 
     def get_prediction(self, v_length=20, mode='sum2v', type='gb'):
@@ -286,6 +309,28 @@ class Vectors():
             #ratio = x/abs(x_prev)
 
             li = np.append(li, [x, length, ema1, ema2, emadiff, y, vol, ratio])
+
+        X_p = pd.DataFrame(li.reshape(1, -1), columns=to_model.columns)
+           # to_model = pd.concat([to_model, temp], ignore_index=True)
+           # X_p = pd.DataFrame(vector.reshape(1, -1), columns=to_model.columns)
+
+        return X_p, x_m
+
+    def vector_to_predict_simple(self, lag_length=10):
+        #to_model = pd.DataFrame()
+        tr_columns = ['X', 'TIME', 'EMA1', 'EMA2', 'EMADIFF', 'TOEMA1', 'TOEMA2', 'RATIO', 'VOLX', 'SIN', 'DIFF1', 'DIFF2', 'DDIFF1',
+                      'DDIFF2']
+        to_model = prep(tr_columns, lag_length)
+        last_lag = self.vectors.shape[0] - (lag_length+1)
+        #vector = self.vector(last_lag, lag_length)
+        r_vector = self.slice(last_lag, lag_length+1)
+        x_m = r_vector.x_max
+        y_m = r_vector.y_max
+        v_m = r_vector.v_max
+        vector = r_vector.normalized
+        #print("V to pred ", vector)
+        #li = np.zeros(0)
+        li = simple_prep(vector, lag_length)
 
         X_p = pd.DataFrame(li.reshape(1, -1), columns=to_model.columns)
            # to_model = pd.concat([to_model, temp], ignore_index=True)
@@ -427,7 +472,7 @@ def normalize_list(list):
     list_norm = np.empty_like(list)
     #print("max", max, vector)
     for i in range(0, len(list)):
-        list_norm[i] = list[i]/max*10
+        list_norm[i] = list[i]/max
         #print(vector[i])
     #print(vector)
     return list_norm, max
@@ -435,7 +480,7 @@ def normalize_list(list):
 def denormalize_list(list_norm, max):
     list = np.empty_like(list_norm)
     for i in range(0, len(list_norm)):
-        list[i] = list_norm[i]*max/10
+        list[i] = list_norm[i]*max
 
     return list
 
@@ -446,6 +491,11 @@ def denormalize_vector(vector, x, y, v):
     denorm_vector[:, 2] = denormalize_list(vector[:, 2], v)  # volume
     denorm_vector[:, 3] = denormalize_list(vector[:, 3], v)  # ema1
     denorm_vector[:, 4] = denormalize_list(vector[:, 4], v)  # ema2
+    denorm_vector[:, 5] = vector[:, 5] #sin
+    denorm_vector[:, 6] = vector[:, 6] #diff-ema1
+    denorm_vector[:, 7] = vector[:, 7] #diff-ema2
+    denorm_vector[:, 8] = vector[:, 8] #diff2-ema1
+    denorm_vector[:, 9] = vector[:, 9] #diff2-ema2
 
     return denorm_vector
 
@@ -458,14 +508,20 @@ def prep(features, lag_length=10):
     to_model = pd.DataFrame(columns=names)
     return to_model
 
-def temp_pred(vector, model_step, step_back, nn=False):
-    modelfile1 = f"gb_model-1step_{model_step+3}_std.pkl" if not nn else f"keras_1step_{model_step+3}_std.nnn"
-    modelfile2 = f"gb_model-2step_{model_step+3}_std.pkl" if not nn else f"keras_2step_{model_step+3}_std.nnn"
-    modelfile3 = f"gb_model-3step_{model_step+3}_std.pkl" if not nn else f"keras_3step_{model_step+3}_std.nnn"
+def temp_pred(vector, model_step, step_back, mode='std', nn=False, model_number=1):
     ve1 = vector.slice(0, -step_back) if step_back > 0 else vector
-    a1 = ve1.fast_predict(modelfile1, model_step, 'std', nn)
-    a2 = ve1.fast_predict(modelfile2, model_step, 'std', nn)
-    a3 = ve1.fast_predict(modelfile3, model_step, 'std', nn)
+    if ve1.vectors[-1,0] < 0:
+        modelfile1 = f"gb_model-1step_{model_step+3}_{mode}.pkl" if not nn else f"keras_1step_{model_step}_{mode}_plus_{model_number}.nnn"
+        #modelfile2 = f"gb_model-2step_{model_step+3}_{mode}.pkl" if not nn else f"keras_2step_{model_step+3}_{mode}_minus.nnn"
+        modelfile2 = f"gb_model-2step_{model_step+3}_{mode}.pkl" if not nn else f"keras_2step_{model_step}_{mode}_plus_{model_number}.nnn"
+        modelfile3 = f"gb_model-3step_{model_step+3}_{mode}.pkl" if not nn else f"keras_3step_{model_step}_{mode}_plus_{model_number}.nnn"
+    else:
+        modelfile1 = f"gb_model-1step_{model_step + 3}_{mode}.pkl" if not nn else f"keras_1step_{model_step}_{mode}_minus_{model_number}.nnn"
+        modelfile2 = f"gb_model-2step_{model_step + 3}_{mode}.pkl" if not nn else f"keras_2step_{model_step}_{mode}_minus_{model_number}.nnn"
+        modelfile3 = f"gb_model-3step_{model_step + 3}_{mode}.pkl" if not nn else f"keras_3step_{model_step}_{mode}_minus_{model_number}.nnn"
+    a1 = ve1.fast_predict(modelfile1, model_step, mode, nn)
+    a2 = ve1.fast_predict(modelfile2, model_step, mode, nn)
+    a3 = ve1.fast_predict(modelfile3, model_step, mode, nn)
     mean_len = vector.vectors[:,1].mean()
     ve1.add(a1, mean_len, 1, 1, 1)
     ve1.add(a2, mean_len, 1, 1, 1)

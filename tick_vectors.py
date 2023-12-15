@@ -7,21 +7,24 @@ import math
 import matplotlib.pyplot as plt
 
 class Tick_vectors(Tick):
-    def __init__(self, data, v_width=0.005, v_prominence=0.01, add_mean=None, comb_ratio=None, flat=False):
+    def __init__(self, data, v_width=0.005, v_prominence=0.01, add_mean=None, ema=(250,1500), normalize=True):
         self.data = data
+        self.normalize_state = normalize
         if add_mean is None:
             self.price = np.array(self.data['CLOSE'])#.rolling(window=200).mean()) #added averaging here
             self.size = data.shape[0]
             self.mean = 30
 
+
         else:
-            self.price = np.array(self.data['CLOSE'].rolling(window=add_mean).mean()[add_mean:]) #added averaging here
+            self.price = np.array(self.data['CLOSE'].rolling(window=add_mean).mean()[add_mean:])#added averaging here
+            self.vol = np.array(self.data['VOL'][add_mean:])
             self.size = data.shape[0]-add_mean
-            self.mean = add_mean/2 #div by 3
+            self.mean = add_mean #div by 3
             v_width = v_width*add_mean/30
             v_prominence = v_width*2
         print("min", self.mean)
-        self.vol = np.array(self.data['VOL'])
+
         self.vol = (self.vol - self.vol.min()) / (self.vol.max() - self.vol.min())
         #super().__init__(file)
         print("Creating Tick_vectors")
@@ -36,28 +39,43 @@ class Tick_vectors(Tick):
         self.vectors = []
         self.vectors_flat = []
         self.vector_base = []
-        self.ema1=self.ema(int(self.size/90))
-        self.ema2=self.ema(int(self.size/40))
-        self.comb_ratio = comb_ratio
-        self.minmax()
+        self.ema1, self.diff_ema1, self.diff2_ema1 = self.ema(ema[0])
+        self.ema2, self.diff_ema2, self.diff2_ema2 = self.ema(ema[1])
+        #cutting data to take ema into account
+        self.ema1 = self.ema1[ema[1]:]
+        self.diff_ema1 = self.diff_ema1[ema[1]:]
+        self.diff2_ema1 = self.diff2_ema1[ema[1]:]
+        self.ema2 = self.ema2[ema[1]:]
+        self.diff_ema2 = self.diff_ema2[ema[1]:]
+        self.diff2_ema2 = self.diff2_ema2[ema[1]:]
+        self.price = self.price[ema[1]:]
+        self.vol = self.vol[ema[1]:]
+
+
+        self.minmax2()
 
 
     @classmethod
-    def from_file(cls, file, v_width=0.005, v_prominence=0.01, add_mean=None, comb_ratio=None, flat=False):
+    def from_file(cls, file, v_width=0.005, v_prominence=0.01, add_mean=None, ema=(250, 1500), normalize=True):
         super().__init__(cls, file)
         print(cls.ticker, add_mean)
 
-        return cls(cls.data, v_width, v_prominence, add_mean, comb_ratio, flat)
+        return cls(cls.data, v_width, v_prominence, add_mean, ema, normalize)
 
     def vector(self, start, width):
 
         vector = self.vectors[start:start+width,:]
         norm_vector = np.empty_like(vector)
-        norm_vector[:, 0] = normalize_list(vector[:, 0]) #x
+        norm_vector[:, 0] = normalize_list(vector[:, 0]) if self.normalize_state else vector[:, 0]/100#x
         norm_vector[:, 1] = normalize_list(vector[:, 1]) #y
         norm_vector[:, 2] = normalize_list(vector[:, 2]) #volume
         norm_vector[:, 3] = normalize_list(vector[:, 3]) #ema1
         norm_vector[:, 4] = normalize_list(vector[:, 4]) #ema2
+        norm_vector[:, 5] = vector[:, 5] #sin
+        norm_vector[:, 6] = vector[:, 6] # diff-ema1
+        norm_vector[:, 7] = vector[:, 7] #diff-ema2
+        norm_vector[:, 8] = vector[:, 8] #diff2-ema1
+        norm_vector[:, 9] = vector[:, 9] #diff2-ema2
 
         return norm_vector
 
@@ -74,6 +92,7 @@ class Tick_vectors(Tick):
         df = pd.DataFrame()
         df['CLOSE'] = self.price
         peaks, _ = find_peaks(df['CLOSE'], prominence=v_prominence , width=v_width, distance=v_width*4000)
+        min_peaks, _ = find_peaks(-df['CLOSE'], prominence=v_prominence, width=v_width, distance=v_width * 4000)
 
         if self.comb_ratio is not None:
             peaks = self.comb_peaks(peaks, self.comb_ratio)
@@ -128,21 +147,245 @@ class Tick_vectors(Tick):
 
         return np.sort(peaks), vectors
 
+    def minmax2(self):
+        from scipy.signal import find_peaks
+        from scipy.signal import find_peaks_cwt
+        #v_prominence = self.v_prominence
+        v_prominence = self.mean/30
+        #v_width = self.v_width
+        v_width = self.mean
+        df = pd.DataFrame()
+        df['CLOSE'] = self.price
+        peaks, _ = find_peaks(df['CLOSE'], prominence=v_prominence, width=v_width/20, distance=v_width)
+        min_peaks, _ = find_peaks(-df['CLOSE'], prominence=v_prominence, width=v_width/20, distance=v_width)
+
+        peaks = np.concatenate((peaks, min_peaks))
+        peaks = np.sort(peaks)
+        print("total", peaks.shape[0])
+        short_one=0
+        peaks = self.remove_short(peaks, self.mean*3)
+        peaks = self.remove_small(peaks, self.mean)
+        peaks = self.remove_short(peaks, self.mean*3)
+        peaks = self.remove_small(peaks, self.mean)
+        peaks = self.remove_short(peaks, self.mean*3)
+        #peaks = self.remove_small(peaks, 5)
+        #peaks = self.remove_short(peaks, 20)
+        #peaks = self.remove_short(peaks, 100)
+        #peaks = self.remove_after_high(peaks, 20)
+        #peaks = self.remove_same(peaks)
+
+
+        print('Maximum vector:', self.find_minmax(peaks))
+
+        #peaks = self.remove_after_high(peaks, 5)
+        #peaks = self.remove_after_high(peaks, 8)
+        #peaks = self.remove_after_high(peaks, 10)
+        #peaks = self.remove_after_high(peaks, 15)
+        #peaks = self.remove_after_high(peaks, 20)
+        #peaks = self.remove_same(peaks)
+        #peaks = self.remove_same(peaks)
+
+
+        #peaks = self.remove_short(peaks, 80)
+
+
+
+        j = 0
+        delta = 1
+        small_change=0
+        #short_one=0
+        lil_rel=0
+        same=0
+
+
+
+        print('Found small change', small_change)
+        print('Found short one', short_one)
+
+
+        j = 0
+        delta = 1
+
+        minusone = 0
+        while j < len(peaks) - 2:
+            vec1 = self.price[peaks[j + 1]] - self.price[peaks[j]]
+            vec2 = self.price[peaks[j + 2]] - self.price[peaks[j + 1]]
+            #print(vec1, vec2)
+            if vec1 * vec2 > 0:
+                peaks = np.delete(peaks, j + 1)
+                minusone += 1
+            else:
+                j += 1
+        print('-1', minusone)
+        print(peaks.shape[0])
+
+
+
+
+        ii = range(0, len(peaks)-2)
+        vectors = np.zeros([len(peaks)-2, 10], dtype=float)
+        for i in ii:
+
+            vectors[i, 0] = self.price[peaks[i + 1]] - self.price[peaks[i]]
+            prct_change = (vectors[i, 0] / self.price[peaks[i]])*100*self.mean*2
+            vectors[i, 1] = peaks[i + 1] - peaks[i]
+            vectors[i, 2] = sum(self.vol[peaks[i]:peaks[i+1]]) * np.sign(vectors[i, 0])
+            vectors[i, 3] = self.price[i] - self.ema1[i]
+            vectors[i, 4] = self.price[i] - self.ema2[i]
+            vectors[i, 5] = prct_change/np.sqrt((prct_change**2 + vectors[i, 1]**2)) #sin
+            if vectors[i, 5] != vectors[i, 5]:
+                print('SINUS NONE', i)
+            #print('SINIS', vectors[i,5], prct_change, vectors[i, 1])#sin
+            vectors[i, 6] = self.diff_ema1[i]
+            vectors[i, 7] = self.diff_ema2[i]
+            vectors[i, 8] = self.diff2_ema1[i]
+            vectors[i, 9] = self.diff2_ema2[i]
+
+
+        self.mean_len = np.mean(np.abs(vectors[:, 1]))
+        self.mean_price_move = np.mean(np.abs(vectors[:, 0]))
+        self.mean_price = self.price.mean()
+        self.peaks = peaks
+        self.vectors = vectors
+        # self.rich_vectors = Vectors(self.vectors, self.price[peaks[0]])
+        self.initial_price = self.price[peaks[0]]
+        self.last_peak = self.peaks[-1]
+        self.first_peak = self.peaks[0]
+        print('mean change:', self.mean_price_move)
+        print('mean price:', self.mean_price)
+        print("total vectors:", vectors.shape[0])
+        return peaks, vectors
+    def remove_same(self, peaks):
+        j=0
+        lil_rel=0
+        same=0
+
+        while j < len(peaks) - 3:
+            vec1 = self.price[peaks[j+1]] - self.price[peaks[j]]
+            vec2 = self.price[peaks[j+2]] - self.price[peaks[j+1]]
+            vec3 = self.price[peaks[j + 3]] - self.price[peaks[j + 2]]
+
+            if abs(vec1)> abs(vec2)*5 or abs(vec2) > abs(vec1)*5:
+                peaks = np.delete(peaks, j+2)
+                peaks = np.delete(peaks, j+1)
+                lil_rel+=2
+                j+=2
+
+            elif 0.8<abs(vec1)/abs(vec2)<1.2:
+                peaks = np.delete(peaks, j+2)
+                peaks = np.delete(peaks, j+1)
+                same+=2
+                j+=1
+
+            else:
+                j += 1
+        print('Found lil relation', lil_rel)
+        print('Found same', same)
+        return peaks
+
+    def remove_after_high(self, peaks, percent):
+        j=0
+        sum=0
+
+        while j < len(peaks) - 3:
+            percent = (self.price[peaks[j]]/100)*(self.mean/10)*3
+            vec1 = self.price[peaks[j+1]] - self.price[peaks[j]]
+            vec2 = self.price[peaks[j+2]] - self.price[peaks[j+1]]
+            vec3 = self.price[peaks[j + 3]] - self.price[peaks[j + 2]]
+            if abs(vec1) > percent and abs(vec2) < abs(vec1)/2 and abs(vec3) < abs(vec1)/2:
+                peaks = np.delete(peaks, j+3)
+                peaks = np.delete(peaks, j+2)
+                sum+=1
+            else:
+                j+=2
+        print("Removed after high:", sum)
+        return peaks
+
+
+    def remove_small(self, peaks, percent):
+        j=0
+        sum=0
+        percents = {'1': 1, '5': 1.1, '10': 1.4, '15': 2.5, '30': 6, '60': 10, '120': 15, '240': 20}
+        #maxprct, percent = self.find_minmax(peaks)
+        #percent = percent * 10
+
+        while j < len(peaks) - 3:
+            #percent = (self.price[peaks[j]]/100)*(self.mean/6)
+            percent = percents[str(self.mean)]
+
+
+            vec1 = self.price[peaks[j+1]] - self.price[peaks[j]]
+            vec2 = (self.price[peaks[j+2]] - self.price[peaks[j+1]])/self.price[peaks[j+1]]*100
+            vec3 = self.price[peaks[j + 3]] - self.price[peaks[j + 2]]
+            if abs(vec2) < percent:# and abs(vec2)<abs(vec1) and abs(vec2)<abs(vec3):
+                peaks = np.delete(peaks, j+2)
+                peaks = np.delete(peaks, j+1)
+                #print('ve', vec1, vec2, vec3)
+                sum+=1
+            else:
+                j+=1
+        print("Removed small:", sum, percent)
+        return peaks
+
+    def remove_short(self, peaks, mult):
+        j=1
+        sum=0
+        while j < len(peaks) - 2:
+            vec1 = self.price[peaks[j]] - self.price[peaks[j - 1]]
+            vec2 = self.price[peaks[j + 1]] - self.price[peaks[j]]
+            vec3 = self.price[peaks[j + 2]] - self.price[peaks[j + 1]]
+            if ((peaks[j + 1] - peaks[j]) < self.mean * mult) and (abs(vec2) < abs(vec3)):
+                peaks = np.delete(peaks, j + 1)
+                peaks = np.delete(peaks, j)
+                sum+=1
+            else:
+                j += 1
+        print("Removed short:", sum)
+        return peaks
+    def find_minmax(self, peaks):
+        maxvec = 0
+        minvec = abs(self.price[peaks[1]] - self.price[peaks[0]])
+        for i, j in zip(peaks, peaks[1:]):
+            vec = self.price[j] - self.price[i]
+            if abs(vec) > maxvec:
+                maxvec=abs(vec)
+            if abs(vec) < minvec:
+                minvec=abs(vec)
+
+        print("Max, min:", maxvec, minvec)
+
+        return maxvec, minvec
+
+
     def comb_peaks(self, peaks, comb_ratio=0.7):
         i = 0
         j = 0
         n = 0
 
         #delta = (self.size/peaks.shape[0])
-        delta=self.mean*10 #to change vector length
-        percent=self.mean/20
+        delta=self.mean*20 #to change vector length
+        percent=3#self.mean/5
         print(self.size, delta, self.mean)
 
         while j < len(peaks) - 1:
-            if (peaks[j + 1] - peaks[j] < delta) or (abs(self.price[peaks[j + 1]] - self.price[peaks[j]])/self.price[peaks[j]]*100<percent):
+            min = self.local_min(peaks, j) - peaks[j]
+            min1 = peaks[j+1] - self.local_min(peaks, j)
+            if peaks[j + 1] - peaks[j] < delta or abs(min-min1)/(min+min1)<0.05:
+                peaks = np.delete(peaks, j+1)
+            else:
+                j += 1
+
+        print('Peaks', peaks.shape)
+
+        j=0
+
+        while j < len(peaks) - 1:
+            if abs((self.price[peaks[j + 1]] - self.price[peaks[j]])/self.price[peaks[j]])*100<percent:
                 peaks = np.delete(peaks, j + 1)
             else:
                 j += 1
+
+        print('Peaks2', peaks.shape)
 
 
 
@@ -164,6 +407,11 @@ class Tick_vectors(Tick):
         print("Vectors that are not flat anymore:" , flats)
 
         return peaks
+    def local_min(self, peaks, j):
+        range1 = int(peaks[j])
+        range2 = int(peaks[j + 1])
+        min1 = range1 + np.argmin(self.price[range1:range2])
+        return min1
 
     def comb_check(self, peaks, i, comb_ratio=1):
         range1 = int(peaks[i])
@@ -299,9 +547,10 @@ class Tick_vectors(Tick):
 def normalize_list(list):
     max = np.abs(list).max()
     list_norm = np.empty_like(list)
+    list_norm = (list/max)
     #print("max", max, vector)
-    for i in range(0, len(list)):
-        list_norm[i] = list[i]/max*10
+    #for i in range(0, len(list)):
+    #    list_norm[i] = list[i]/max*10
         #print(vector[i])
     #print(vector)
     return list_norm
@@ -339,6 +588,9 @@ def corr_vectors(one, two, vector_correlation): #compares two vectors
     return 1
 
 
+
+
+
 def plot_nvector_any(vector, width=1, rgb=(), divider=0):
     x = 0
     y = 0
@@ -353,7 +605,7 @@ def plot_nvector_any(vector, width=1, rgb=(), divider=0):
         x = x + vector[i, 0]
         y = y + vector[i, 1]
         plt.plot(y1, x1, color=rgb)
-        plt.plot(yv, xv, color=rgb)
+        #plt.plot(yv, xv, color=rgb)
         if i > 1 and i > divider-1 and divider != 0:
             plt.plot(y1, x1, "xr")
 

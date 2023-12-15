@@ -7,10 +7,11 @@ p_test = Path('join\\test')
 all_train = pd.DataFrame()
 all_test = pd.DataFrame()
 
-for file in p_train.glob('*.csv'):
+for file in p_train.glob('*.txt'):
     data=pd.DataFrame()
     data = pd.read_csv(file, delimiter=',', names=['1','2','3','4','5','6'])
-    #print(data)
+    tik = file.name[:4]
+    print(tik)
     all_train = pd.concat([all_train, data], ignore_index=True, axis=0)#axis=1)
 
 for file in p_test.glob('*.csv'):
@@ -21,6 +22,6 @@ for file in p_test.glob('*.csv'):
 
 
 print(all_test)
-all_train.to_csv('GAZP_big_training_set.csv', header=False, index=False, sep=',')
-all_test.to_csv('GZAP_big_test_set.csv', header=False, index=False, sep=',')
+all_train.to_csv(f'{tik}_all_data.csv', header=False, index=False, sep=',')
+#all_test.to_csv('MOEX_big_test_set.csv', header=False, index=False, sep=',')
 
